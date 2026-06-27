@@ -24,7 +24,7 @@ final class SslocalConfigTests: XCTestCase {
         XCTAssertEqual(config.locals.count, 1)
         XCTAssertEqual(config.locals[0].local_address, "127.0.0.1")
         XCTAssertEqual(config.locals[0].local_port, 1080)
-        XCTAssertEqual(config.locals[0].protocol, "socks5")
+        XCTAssertEqual(config.locals[0].`protocol`, "socks5")
     }
 
     func testConfigWithHTTPProxy() throws {
@@ -38,9 +38,9 @@ final class SslocalConfigTests: XCTestCase {
         let config = SslocalConfig.from(server: server, socksPort: 1080, httpPort: 1081)
 
         XCTAssertEqual(config.locals.count, 2)
-        XCTAssertEqual(config.locals[0].protocol, "socks5")
+        XCTAssertEqual(config.locals[0].`protocol`, "socks5")
         XCTAssertEqual(config.locals[0].local_port, 1080)
-        XCTAssertEqual(config.locals[1].protocol, "http")
+        XCTAssertEqual(config.locals[1].`protocol`, "http")
         XCTAssertEqual(config.locals[1].local_port, 1081)
     }
 
