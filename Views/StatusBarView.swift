@@ -1,5 +1,5 @@
 // StatusBarView — Main MenuBarExtra popup panel
-// Shows proxy status, server list, and quick actions
+// Sheets don't work in NSMenu popovers → use inline expansion or open Settings
 
 import SwiftUI
 
@@ -7,13 +7,8 @@ struct StatusBarView: View {
     @ObservedObject var proxyService: ProxyService
     @ObservedObject var serverStore: ServerStore
     @ObservedObject var subscriptionStore: SubscriptionStore
-    @State private var activeSheet: ActiveSheet?
-
-    private enum ActiveSheet: Identifiable {
-        case addServer
-        case addSubscription
-        var id: Self { self }
-    }
+    @State private var showAddServer = false
+    @State private var showAddSubscription = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -29,12 +24,22 @@ struct StatusBarView: View {
                 serverList
             }
 
+            // === Inline Add Forms ===
+            if showAddServer {
+                Divider()
+                inlineAddServer
+            }
+            if showAddSubscription {
+                Divider()
+                inlineAddSubscription
+            }
+
             Divider()
 
             // === Quick Actions ===
             actionButtons
         }
-        .frame(width: 280)
+        .frame(width: 300)
         .padding(12)
     }
 
@@ -67,6 +72,16 @@ struct StatusBarView: View {
                 }
                 .buttonStyle(.borderless)
                 .help("断开连接")
+            } else if let first = sortedServers.first {
+                Button {
+                    Task {
+                        try? await proxyService.start(serverID: first.id, serverStore: serverStore)
+                    }
+                } label: {
+                    Image(systemName: "play.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("快速连接")
             }
         }
     }
@@ -75,7 +90,7 @@ struct StatusBarView: View {
 
     private var serverList: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 4) {
+            LazyVStack(alignment: .leading, spacing: 2) {
                 ForEach(sortedServers) { server in
                     serverRow(server)
                 }
@@ -86,12 +101,10 @@ struct StatusBarView: View {
 
     private func serverRow(_ server: Server) -> some View {
         HStack(spacing: 8) {
-            // Selection indicator
             Circle()
                 .fill(proxyService.activeServerID == server.id ? Color.blue : Color.clear)
                 .frame(width: 8, height: 8)
 
-            // Server info
             VStack(alignment: .leading, spacing: 1) {
                 Text(server.displayName)
                     .font(.body)
@@ -108,18 +121,10 @@ struct StatusBarView: View {
 
             Spacer()
 
-            // Quick connect button
             if !proxyService.isActive || proxyService.activeServerID != server.id {
                 Button {
                     Task {
-                        do {
-                            try await proxyService.start(
-                                serverID: server.id,
-                                serverStore: serverStore
-                            )
-                        } catch {
-                            // Error shown via proxyService.errorMessage
-                        }
+                        try? await proxyService.start(serverID: server.id, serverStore: serverStore)
                     }
                 } label: {
                     Image(systemName: "play.circle")
@@ -132,12 +137,7 @@ struct StatusBarView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             Task {
-                do {
-                    try await proxyService.start(
-                        serverID: server.id,
-                        serverStore: serverStore
-                    )
-                } catch { }
+                try? await proxyService.start(serverID: server.id, serverStore: serverStore)
             }
         }
     }
@@ -153,42 +153,152 @@ struct StatusBarView: View {
             .cornerRadius(4)
     }
 
-    // MARK: - Sorted Servers
-
     private var sortedServers: [Server] {
         serverStore.servers.sorted { a, b in
-            // Active server first, then by latency
             if proxyService.activeServerID == a.id { return true }
             if proxyService.activeServerID == b.id { return false }
-            let latA = a.latency ?? Int.max
-            let latB = b.latency ?? Int.max
-            return latA < latB
+            return (a.latency ?? Int.max) < (b.latency ?? Int.max)
         }
     }
 
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "plus.circle")
-                .font(.largeTitle)
-                .foregroundColor(.secondary)
+        VStack(spacing: 6) {
             Text("还没有服务器配置")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            HStack(spacing: 12) {
-                Button("添加服务器") {
-                    activeSheet = .addServer
-                }
-                .buttonStyle(.borderless)
-                Button("导入订阅") {
-                    activeSheet = .addSubscription
-                }
-                .buttonStyle(.borderless)
-            }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Inline Add Server
+
+    private var inlineAddServer: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("添加服务器").font(.headline)
+
+            TextField("服务器地址", text: $addServerAddress)
+                .textFieldStyle(.roundedBorder)
+                .font(.body)
+            HStack {
+                TextField("端口", text: $addServerPort)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 80)
+                Picker("", selection: $addServerCipher) {
+                    ForEach(CipherMethod.allCases, id: \.rawValue) { m in
+                        Text(m.displayName).tag(m)
+                    }
+                }
+                .frame(width: 180)
+            }
+            SecureField("密码", text: $addServerPassword)
+                .textFieldStyle(.roundedBorder)
+            TextField("备注", text: $addServerRemark)
+                .textFieldStyle(.roundedBorder)
+
+            HStack {
+                Button("取消") {
+                    showAddServer = false
+                    clearAddServerFields()
+                }
+                Spacer()
+                Button("从剪贴板导入") {
+                    if let content = PasteboardParser.detectShadowsocksContent() {
+                        if let servers = try? SubscriptionParser.parse(content), let first = servers.first {
+                            addServerAddress = first.address
+                            addServerPort = String(first.port)
+                            addServerCipher = first.cipher
+                            addServerPassword = first.password
+                            addServerRemark = first.remark
+                        }
+                    }
+                }
+                Button("添加") {
+                    saveServer()
+                }
+                .disabled(addServerAddress.isEmpty || addServerPassword.isEmpty)
+                .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    @State private var addServerAddress = ""
+    @State private var addServerPort = "8388"
+    @State private var addServerCipher: CipherMethod = .aes256Gcm
+    @State private var addServerPassword = ""
+    @State private var addServerRemark = ""
+
+    private func saveServer() {
+        guard !addServerAddress.isEmpty, let port = UInt16(addServerPort), !addServerPassword.isEmpty else { return }
+        let server = Server(
+            address: addServerAddress,
+            port: port,
+            cipher: addServerCipher,
+            password: addServerPassword,
+            remark: addServerRemark
+        )
+        try? serverStore.add(server)
+        showAddServer = false
+        clearAddServerFields()
+    }
+
+    private func clearAddServerFields() {
+        addServerAddress = ""
+        addServerPort = "8388"
+        addServerCipher = .aes256Gcm
+        addServerPassword = ""
+        addServerRemark = ""
+    }
+
+    // MARK: - Inline Add Subscription
+
+    private var inlineAddSubscription: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("导入订阅").font(.headline)
+
+            TextField("订阅链接", text: $addSubURL)
+                .textFieldStyle(.roundedBorder)
+
+            Button("从剪贴板识别") {
+                if let content = PasteboardParser.detectShadowsocksContent() {
+                    addSubURL = content
+                }
+            }
+
+            HStack {
+                Button("取消") {
+                    showAddSubscription = false
+                    addSubURL = ""
+                }
+                Spacer()
+                Button("导入") {
+                    saveSubscription()
+                }
+                .disabled(addSubURL.isEmpty)
+                .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    @State private var addSubURL = ""
+
+    private func saveSubscription() {
+        guard !addSubURL.isEmpty else { return }
+        let sub = Subscription(url: addSubURL)
+        subscriptionStore.add(sub)
+
+        let updateService = SubscriptionUpdateService(serverStore: serverStore, subscriptionStore: subscriptionStore)
+        Task {
+            do {
+                let servers = try await updateService.fetchSubscription(sub)
+                try updateService.mergeServers(fetched: servers, from: sub)
+            } catch { }
+        }
+
+        showAddSubscription = false
+        addSubURL = ""
     }
 
     // MARK: - Action Buttons
@@ -211,27 +321,35 @@ struct StatusBarView: View {
 
             Spacer()
 
-            Button {
-                activeSheet = .addServer
-            } label: {
-                Image(systemName: "plus")
+            if !showAddServer {
+                Button {
+                    showAddServer = true
+                    showAddSubscription = false
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.borderless)
+                .help("添加服务器")
             }
-            .buttonStyle(.borderless)
+
+            if !showAddSubscription {
+                Button {
+                    showAddSubscription = true
+                    showAddServer = false
+                } label: {
+                    Image(systemName: "link")
+                }
+                .buttonStyle(.borderless)
+                .help("导入订阅")
+            }
 
             Button {
-                activeSheet = .addSubscription
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
             } label: {
-                Image(systemName: "link")
+                Image(systemName: "gearshape")
             }
             .buttonStyle(.borderless)
-        }
-        .sheet(item: $activeSheet) { sheet in
-            switch sheet {
-            case .addServer:
-                AddServerView(serverStore: serverStore)
-            case .addSubscription:
-                AddSubscriptionView(subscriptionStore: subscriptionStore, serverStore: serverStore)
-            }
+            .help("设置")
         }
     }
 }
