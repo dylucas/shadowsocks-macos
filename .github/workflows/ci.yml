@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: macos-14 # M1 runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build
+        run: |
+          xcodebuild -scheme Shadowsocks \
+            -destination 'platform=macOS,arch=arm64' \
+            -configuration Debug \
+            build
+
+      - name: Run unit tests
+        run: |
+          xcodebuild test -scheme Shadowsocks \
+            -destination 'platform=macOS,arch=arm64' \
+            -only-testing:ShadowsocksTests
+
+      - name: SwiftLint
+        run: |
+          brew install swiftlint
+          swiftlint lint --reporter github-actions-logging
