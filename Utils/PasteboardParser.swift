@@ -9,8 +9,8 @@ enum PasteboardParser {
     static func detectShadowsocksContent() -> String? {
         let pasteboard = NSPasteboard.general
 
-        // Check for URL types
-        if let url = pasteboard.string(forType: .url), url.hasPrefix("ss://") {
+        // Check for URL types (use .URL on macOS, not .url)
+        if let url = pasteboard.string(forType: .URL), url.hasPrefix("ss://") {
             return url
         }
 
