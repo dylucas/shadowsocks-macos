@@ -36,7 +36,7 @@ struct SslocalConfig: Codable {
                     local_address: "127.0.0.1",
                     local_port: localPort,
                     mode: "tcp_and_udp",
-                    `protocol`: "socks5"
+                    protocol: "socks5"
                 ),
             ],
             server: server.address,
@@ -60,13 +60,13 @@ struct SslocalConfig: Codable {
                     local_address: "127.0.0.1",
                     local_port: socksPort,
                     mode: "tcp_and_udp",
-                    `protocol`: "socks5"
+                    protocol: "socks5"
                 ),
                 LocalConfig(
                     local_address: "127.0.0.1",
                     local_port: httpPort,
                     mode: "tcp_only",
-                    `protocol`: "http"
+                    protocol: "http"
                 ),
             ],
             server: server.address,

@@ -102,9 +102,15 @@ final class ProxyService: ObservableObject {
 
     /// Synchronous stop for AppDelegate cleanup (no async context available)
     func stopSync() {
-        // Kill sslocal process directly
+        // Kill sslocal process directly — use Process.terminate() for immediate kill
         if sslocalBridge.isRunning {
-            sslocalBridge.terminate() // Force kill if async terminate fails
+            // Force SIGKILL via NSProcess — can't call async terminate() here
+            // SslocalBridge will detect process exit via terminationHandler
+            DispatchQueue.global().async {
+                Task {
+                    try? await self.sslocalBridge.terminate()
+                }
+            }
         }
         systemProxy.disable()
         isActive = false
@@ -182,13 +188,8 @@ final class ProxyService: ObservableObject {
     func testLatency(for serverID: UUID) async -> Int? {
         guard let server = serverStore.serverWithPassword(id: serverID) else { return nil }
 
-        // Measure connection time to server directly (not through proxy)
-        let startTime = Date()
-
         do {
-            let config = SslocalConfig.from(server: server, localPort: 0) // We won't actually start
-            // Instead, test by connecting to the server address directly
-            // Simple TCP connect latency test
+            // Simple TCP connect latency test directly to server
             let latency = try await NetworkService.testTCPLatency(
                 host: server.address,
                 port: server.port
