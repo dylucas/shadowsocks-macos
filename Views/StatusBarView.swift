@@ -5,10 +5,12 @@ import SwiftUI
 
 struct StatusBarView: View {
     @ObservedObject var proxyService: ProxyService
-    @StateObject private var serverStore = ServerStore()
+    @ObservedObject var serverStore: ServerStore
+    @ObservedObject var subscriptionStore: SubscriptionStore
     @State private var selectedServerID: UUID?
     @State private var showingSettings = false
     @State private var showingAddServer = false
+    @State private var showingAddSubscription = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -107,7 +109,14 @@ struct StatusBarView: View {
             if !proxyService.isActive || proxyService.activeServerID != server.id {
                 Button {
                     Task {
-                        try? await proxyService.start(serverID: server.id)
+                        do {
+                            try await proxyService.start(
+                                serverID: server.id,
+                                serverStore: serverStore
+                            )
+                        } catch {
+                            // Error shown via proxyService.errorMessage
+                        }
                     }
                 } label: {
                     Image(systemName: "play.circle")
@@ -137,12 +146,10 @@ struct StatusBarView: View {
     // MARK: - Sorted Servers
 
     private var sortedServers: [Server] {
-        serverStore.servers.sorted { a, b ->
-            Bool in
+        serverStore.servers.sorted { a, b in
             // Active server first, then by latency
             if proxyService.activeServerID == a.id { return true }
             if proxyService.activeServerID == b.id { return false }
-
             let latA = a.latency ?? Int.max
             let latB = b.latency ?? Int.max
             return latA < latB
@@ -159,10 +166,16 @@ struct StatusBarView: View {
             Text("还没有服务器配置")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            Button("添加服务器") {
-                showingAddServer = true
+            HStack(spacing: 12) {
+                Button("添加服务器") {
+                    showingAddServer = true
+                }
+                .buttonStyle(.borderless)
+                Button("导入订阅") {
+                    showingAddSubscription = true
+                }
+                .buttonStyle(.borderless)
             }
-            .buttonStyle(.borderless)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
@@ -174,7 +187,6 @@ struct StatusBarView: View {
         HStack {
             Button {
                 Task {
-                    // Test all server latencies
                     let results = await NetworkService.batchLatencyTest(
                         servers: serverStore.allServersWithPasswords()
                     )
@@ -190,11 +202,24 @@ struct StatusBarView: View {
             Spacer()
 
             Button {
-                showingSettings = true
+                showingAddServer = true
             } label: {
-                Label("设置", systemImage: "gearshape")
+                Image(systemName: "plus")
             }
             .buttonStyle(.borderless)
+
+            Button {
+                showingAddSubscription = true
+            } label: {
+                Image(systemName: "link")
+            }
+            .buttonStyle(.borderless)
+        }
+        .sheet(isPresented: $showingAddServer) {
+            AddServerView(serverStore: serverStore)
+        }
+        .sheet(isPresented: $showingAddSubscription) {
+            AddSubscriptionView(subscriptionStore: subscriptionStore, serverStore: serverStore)
         }
     }
 }

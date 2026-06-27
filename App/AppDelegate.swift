@@ -1,6 +1,7 @@
 // AppDelegate — Handles lifecycle, cleanup, and system proxy rollback on exit
 
 import AppKit
+import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var proxyService: ProxyService?
@@ -15,12 +16,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         // Rollback system proxy on normal exit
-        if let proxyService {
-            proxyService.stopSync()
-        }
+        proxyService?.stopSync()
     }
 
-    /// Inject ProxyService reference for cleanup
+    /// Inject ProxyService reference for cleanup — called from ShadowsocksApp
     func configure(proxyService: ProxyService) {
         self.proxyService = proxyService
     }

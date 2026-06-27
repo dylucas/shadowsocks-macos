@@ -12,29 +12,53 @@ final class NetworkService {
 
     // MARK: - TCP Latency Test
 
-    /// Test TCP connection latency to a host:port (measures time to establish connection)
+    /// Test TCP connection latency to a host:port
     static func testTCPLatency(host: String, port: UInt16, timeout: TimeInterval = 5.0) async throws -> Int {
-        let startTime = Date()
-
-        // Use NWConnection for modern Network framework
-        let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: NWEndpoint.Port(rawValue: port)!)
+        guard let nwPort = NWEndpoint.Port(rawValue: port) else {
+            throw NetworkError.invalidPort
+        }
+        let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: nwPort)
         let connection = NWConnection(to: endpoint, using: .tcp)
-        let stateHandler = ConnectionStateHandler()
 
-        connection.stateUpdateHandler = stateHandler.handler
-        connection.start(queue: .global())
+        let startTime = Date()
+        let connected = await withCheckedContinuation { continuation in
+            var resumed = false
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(returning: true)
+                    }
+                case .failed, .cancelled:
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(returning: false)
+                    }
+                default:
+                    break
+                }
+            }
+            connection.start(queue: .global())
 
-        // Wait for connection state change
-        let connected = await stateHandler.waitForConnected(timeout: timeout)
+            // Timeout safety net
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                if !resumed {
+                    resumed = true
+                    connection.cancel()
+                    continuation.resume(returning: false)
+                }
+            }
+        }
 
         connection.cancel()
 
-        if !connected {
+        if connected {
+            let elapsed = Date().timeIntervalSince(startTime)
+            return Int(elapsed * 1000)
+        } else {
             throw NetworkError.connectionTimeout
         }
-
-        let elapsed = Date().timeIntervalSince(startTime)
-        return Int(elapsed * 1000) // Convert to milliseconds
     }
 
     // MARK: - Batch Latency Test
@@ -63,51 +87,43 @@ final class NetworkService {
 
     // MARK: - SOCKS5 Connectivity Test
 
-    /// Test if the local SOCKS5 proxy is functional by making a request through it
+    /// Test if the local SOCKS5 proxy is functional
     static func testSOCKS5Proxy(host: String = "127.0.0.1", port: UInt16 = 1080) async -> Bool {
-        // Simple test: try to connect to the SOCKS5 port
-        let endpoint = NWEndpoint.hostPort(
-            host: NWEndpoint.Host(host),
-            port: NWEndpoint.Port(rawValue: port)!
-        )
+        guard let nwPort = NWEndpoint.Port(rawValue: port) else { return false }
+        let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: nwPort)
         let connection = NWConnection(to: endpoint, using: .tcp)
-        let stateHandler = ConnectionStateHandler()
 
-        connection.stateUpdateHandler = stateHandler.handler
-        connection.start(queue: .global())
+        let connected = await withCheckedContinuation { continuation in
+            var resumed = false
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(returning: true)
+                    }
+                case .failed, .cancelled:
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(returning: false)
+                    }
+                default:
+                    break
+                }
+            }
+            connection.start(queue: .global())
 
-        let connected = await stateHandler.waitForConnected(timeout: 3.0)
-        connection.cancel()
-
-        return connected
-    }
-}
-
-// MARK: - Connection State Handler
-
-/// Helper class to await NWConnection state changes
-private class ConnectionStateHandler {
-    private let continuation: CheckedContinuation<Bool, Never>?
-
-    init() {
-        // Continuation will be created in waitForConnected
-        continuation = nil
-    }
-
-    var handler: ((NWConnection.State) -> Void) {
-        return { state in
-            // State changes are handled via async mechanism
-        }
-    }
-
-    func waitForConnected(timeout: TimeInterval) async -> Bool {
-        return await withCheckedContinuation { continuation in
-            // For simplicity, we'll use a timeout-based approach
-            // Real implementation would properly await NWConnection state
-            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
-                continuation.resume(returning: false)
+            DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) {
+                if !resumed {
+                    resumed = true
+                    connection.cancel()
+                    continuation.resume(returning: false)
+                }
             }
         }
+
+        connection.cancel()
+        return connected
     }
 }
 
@@ -115,20 +131,17 @@ private class ConnectionStateHandler {
 
 enum NetworkError: LocalizedError {
     case connectionTimeout
-    case connectionRefused
+    case invalidPort
     case hostNotFound
-    case unknownError
 
     var errorDescription: String? {
         switch self {
         case .connectionTimeout:
             return "连接超时，服务器可能不可达"
-        case .connectionRefused:
-            return "连接被拒绝，服务器端口可能未开放"
+        case .invalidPort:
+            return "端口无效"
         case .hostNotFound:
             return "无法解析服务器地址"
-        case .unknownError:
-            return "未知网络错误"
         }
     }
 }

@@ -24,7 +24,7 @@ final class SslocalConfigTests: XCTestCase {
         XCTAssertEqual(config.locals.count, 1)
         XCTAssertEqual(config.locals[0].local_address, "127.0.0.1")
         XCTAssertEqual(config.locals[0].local_port, 1080)
-        XCTAssertEqual(config.locals[0].`protocol`, "socks5")
+        XCTAssertEqual(config.locals[0].localProtocol, "socks5")
     }
 
     func testConfigWithHTTPProxy() throws {
@@ -38,9 +38,9 @@ final class SslocalConfigTests: XCTestCase {
         let config = SslocalConfig.from(server: server, socksPort: 1080, httpPort: 1081)
 
         XCTAssertEqual(config.locals.count, 2)
-        XCTAssertEqual(config.locals[0].`protocol`, "socks5")
+        XCTAssertEqual(config.locals[0].localProtocol, "socks5")
         XCTAssertEqual(config.locals[0].local_port, 1080)
-        XCTAssertEqual(config.locals[1].`protocol`, "http")
+        XCTAssertEqual(config.locals[1].localProtocol, "http")
         XCTAssertEqual(config.locals[1].local_port, 1081)
     }
 
@@ -58,7 +58,7 @@ final class SslocalConfigTests: XCTestCase {
         XCTAssertEqual(config.password, "2022-password")
     }
 
-    // MARK: - JSON Serialization
+    // MARK: - JSON Serialization (protocol key should be "protocol" not "localProtocol")
 
     func testJSONSerialization() throws {
         let server = Server(
@@ -71,12 +71,14 @@ final class SslocalConfigTests: XCTestCase {
         let config = SslocalConfig.from(server: server)
         let json = try config.toJSON()
 
-        // Verify JSON contains expected keys
+        // Verify JSON contains expected keys — "protocol" (not "localProtocol") due to CodingKeys
         XCTAssertTrue(json.contains("\"server\""))
         XCTAssertTrue(json.contains("\"server_port\""))
         XCTAssertTrue(json.contains("\"method\""))
         XCTAssertTrue(json.contains("\"password\""))
         XCTAssertTrue(json.contains("\"locals\""))
+        XCTAssertTrue(json.contains("\"protocol\""))
+        XCTAssertFalse(json.contains("\"localProtocol\""))
     }
 
     // MARK: - File Writing
@@ -92,14 +94,11 @@ final class SslocalConfigTests: XCTestCase {
         let config = SslocalConfig.from(server: server)
         let fileURL = try config.writeToFile()
 
-        // Verify file exists
         XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
 
-        // Verify file content
         let content = try String(contentsOf: fileURL, encoding: .utf8)
         XCTAssertTrue(content.contains("\"server\": \"1.2.3.4\""))
 
-        // Clean up
         try FileManager.default.removeItem(at: fileURL)
     }
 

@@ -41,21 +41,14 @@ final class SubscriptionUpdateService {
 
     // MARK: - Merge Servers
 
-    /// Merge fetched servers into ServerStore, preserving manually-added servers
-    /// Strategy: Replace all servers from this subscription, keep manual servers untouched
+    /// Merge fetched servers: remove servers from THIS subscription, then add fetched ones.
+    /// Preserve manual servers and servers from OTHER subscriptions.
     func mergeServers(fetched: [Server], from subscription: Subscription) throws {
-        // Remove old servers from this subscription
-        let existing = serverStore.servers.filter { !$0.isManual }
-        let existingFromSub = existing.filter {
-            // Match by subscription source (same address+port combination)
-            fetched.contains { $0.address == server.address && server.port == $0.port }
+        // Remove servers that came from this subscription (matched by address+port)
+        let fetchedAddresses = Set(fetched.map { "\( $0.address):\( $0.port)" })
+        let toRemove = serverStore.servers.filter {
+            !$0.isManual && fetchedAddresses.contains("\($0.address):\($0.port)")
         }
-        // Actually, simpler: tag servers by subscription ID
-        // For MVP: remove all non-manual servers that match fetched addresses
-        // and add all fetched servers
-
-        // Remove all auto (subscription-derived) servers
-        let toRemove = serverStore.servers.filter { !$0.isManual }
         for server in toRemove {
             serverStore.delete(server)
         }
@@ -92,7 +85,6 @@ enum UpdateError: LocalizedError {
     case invalidURL
     case networkError(statusCode: Int)
     case invalidContent
-    case parseError(underlying: ParseError)
 
     var errorDescription: String? {
         switch self {
@@ -102,8 +94,6 @@ enum UpdateError: LocalizedError {
             return "网络请求失败（状态码: \(code)）"
         case .invalidContent:
             return "订阅内容无法解析"
-        case .parseError(let error):
-            return error.errorDescription
         }
     }
 }

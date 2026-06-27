@@ -148,11 +148,12 @@ final class SslocalBridge: ObservableObject {
 
     // MARK: - Terminate
 
-    /// Gracefully terminate sslocal (SIGTERM)
+    /// Gracefully terminate sslocal (SIGTERM first, then SIGKILL fallback)
     func terminate() async throws {
         guard let process, isRunning else { return }
 
-        process.interrupt() // SIGTERM equivalent
+        // Send SIGTERM via Process.terminate()
+        process.terminate()
 
         // Wait for process to exit (up to 3 seconds)
         let deadline = Date().addingTimeInterval(3.0)
@@ -160,9 +161,9 @@ final class SslocalBridge: ObservableObject {
             try await Task.sleep(nanoseconds: 100_000_000) // 0.1s
         }
 
-        // Force kill if still running
+        // Force SIGKILL if still running
         if process.isRunning {
-            process.terminate() // SIGKILL
+            kill(process.processIdentifier, SIGKILL)
         }
 
         isRunning = false

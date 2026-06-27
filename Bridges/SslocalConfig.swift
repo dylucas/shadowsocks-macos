@@ -24,7 +24,15 @@ struct SslocalConfig: Codable {
         let local_address: String
         let local_port: UInt16
         let mode: String // "tcp_and_udp"
-        let `protocol`: String // "socks5" — backticks because protocol is a Swift keyword
+        // Use CodingKeys to map the Swift-safe property name to JSON key "protocol"
+        let localProtocol: String // "socks5" or "http"
+
+        enum CodingKeys: String, CodingKey {
+            case local_address
+            case local_port
+            case mode
+            case localProtocol = "protocol"
+        }
     }
 
     // MARK: - Create from Server
@@ -36,7 +44,7 @@ struct SslocalConfig: Codable {
                     local_address: "127.0.0.1",
                     local_port: localPort,
                     mode: "tcp_and_udp",
-                    protocol: "socks5"
+                    localProtocol: "socks5"
                 ),
             ],
             server: server.address,
@@ -60,13 +68,13 @@ struct SslocalConfig: Codable {
                     local_address: "127.0.0.1",
                     local_port: socksPort,
                     mode: "tcp_and_udp",
-                    protocol: "socks5"
+                    localProtocol: "socks5"
                 ),
                 LocalConfig(
                     local_address: "127.0.0.1",
                     local_port: httpPort,
                     mode: "tcp_only",
-                    protocol: "http"
+                    localProtocol: "http"
                 ),
             ],
             server: server.address,

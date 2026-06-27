@@ -25,8 +25,8 @@ struct ServerListView: View {
             Divider()
 
             // === Server List ===
-            List(filteredServers, selection: $selectedServerID) {
-                serverRow($0)
+            List(filteredServers, selection: $selectedServerID) { server in
+                serverRow(server)
             }
             .listStyle(.sidebar)
 
@@ -84,7 +84,7 @@ struct ServerListView: View {
 
     // MARK: - Server Row
 
-    private func serverRow(_ server: Binding<Server>) -> some View {
+    private func serverRow(_ server: Server) -> some View {
         HStack(spacing: 12) {
             // Connection indicator
             Circle()
@@ -92,12 +92,12 @@ struct ServerListView: View {
                 .frame(width: 10, height: 10)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(server.displayName.wrappedValue)
+                Text(server.displayName)
                     .font(.body)
-                Text("\(server.address.wrappedValue):\(server.port.wrappedValue)")
+                Text("\(server.address):\(server.port)")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text(server.cipher.wrappedValue.displayName)
+                Text(server.cipher.displayName)
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -105,7 +105,7 @@ struct ServerListView: View {
             Spacer()
 
             // Latency badge
-            if let latency = server.latency.wrappedValue {
+            if let latency = server.latency {
                 Text("\(latency)ms")
                     .font(.caption)
                     .foregroundColor(latency < 100 ? .green : (latency < 300 ? .orange : .red))
@@ -154,37 +154,44 @@ struct AddServerView: View {
     @State private var remark = ""
 
     var body: some View {
-        Form {
-            TextField("名称", text: $name)
-            TextField("服务器地址", text: $address)
-            TextField("端口", text: $port)
-            Picker("加密方式", selection: $cipher) {
-                ForEach(CipherMethod.allCases, id: \.rawValue) { method in
-                    Text(method.displayName).tag(method)
-                }
-            }
-            SecureField("密码", text: $password)
-            TextField("备注", text: $remark)
+        VStack(spacing: 16) {
+            Text("添加服务器")
+                .font(.headline)
 
-            // Paste from clipboard
-            Button("从剪贴板导入 ss:// URL") {
-                if let content = PasteboardParser.detectShadowsocksContent() {
-                    if let servers = try? SubscriptionParser.parse(content), let first = servers.first {
-                        address = first.address
-                        port = String(first.port)
-                        cipher = first.cipher
-                        password = first.password
-                        remark = first.remark
-                        name = first.name
+            Form {
+                TextField("名称", text: $name)
+                TextField("服务器地址", text: $address)
+                TextField("端口", text: $port)
+                Picker("加密方式", selection: $cipher) {
+                    ForEach(CipherMethod.allCases, id: \.rawValue) { method in
+                        Text(method.displayName).tag(method)
                     }
                 }
+                SecureField("密码", text: $password)
+                TextField("备注", text: $remark)
+
+                Button("从剪贴板导入 ss:// URL") {
+                    if let content = PasteboardParser.detectShadowsocksContent() {
+                        if let servers = try? SubscriptionParser.parse(content), let first = servers.first {
+                            address = first.address
+                            port = String(first.port)
+                            cipher = first.cipher
+                            password = first.password
+                            remark = first.remark
+                            name = first.name
+                        }
+                    }
+                }
+            }
+
+            HStack {
+                Button("取消") { dismiss() }
+                Button("添加") { saveServer() }
+                    .disabled(address.isEmpty || password.isEmpty)
             }
         }
         .padding()
         .frame(width: 360)
-        .onSubmit {
-            saveServer()
-        }
     }
 
     private func saveServer() {
@@ -203,7 +210,7 @@ struct AddServerView: View {
             try serverStore.add(server)
             dismiss()
         } catch {
-            // Handle error — show in UI
+            // Handle error
         }
     }
 }

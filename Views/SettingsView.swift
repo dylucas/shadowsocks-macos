@@ -1,20 +1,17 @@
-// SettingsView — General application settings (port, proxy mode, auto-start, etc.)
+// SettingsView — General application settings
 
 import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var proxyService: ProxyService
+    @ObservedObject var serverStore: ServerStore
+    @ObservedObject var subscriptionStore: SubscriptionStore
 
     @AppStorage("localPort") private var localPort: Int = 1080
-    @AppStorage("proxyMode") private var proxyModeRaw: String = ProxyMode.pac.rawValue
+    @AppStorage("proxyModeRaw") private var proxyModeRaw: String = "PAC 自动代理"
     @AppStorage("autoStart") private var autoStart: Bool = false
     @AppStorage("updateInterval") private var updateInterval: Int = 6
     @AppStorage("showLatencyInList") private var showLatencyInList: Bool = true
-
-    private var proxyMode: ProxyMode {
-        get { ProxyMode(rawValue: proxyModeRaw) ?? .pac }
-        set { proxyModeRaw = newValue.rawValue }
-    }
 
     var body: some View {
         TabView {
@@ -45,28 +42,21 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         Form {
-            // Local port
             Picker("本地 SOCKS5 端口", selection: $localPort) {
                 Text("1080").tag(1080)
                 Text("1081").tag(1081)
                 Text("1086").tag(1086)
-                Text("自定义").tag(0)
             }
 
-            // Proxy mode
-            Picker("代理模式", selection: $proxyMode) {
+            Picker("代理模式", selection: $proxyModeRaw) {
                 ForEach(ProxyMode.allCases, id: \.rawValue) { mode in
-                    Text(mode.rawValue).tag(mode)
+                    Text(mode.rawValue).tag(mode.rawValue)
                 }
             }
 
-            // Auto start
             Toggle("开机自动启动", isOn: $autoStart)
-
-            // Show latency
             Toggle("列表显示延迟", isOn: $showLatencyInList)
 
-            // Update interval
             Picker("订阅更新频率", selection: $updateInterval) {
                 Text("每小时").tag(1)
                 Text("每 6 小时").tag(6)
@@ -77,7 +67,6 @@ struct SettingsView: View {
 
             Divider()
 
-            // Hardware acceleration info
             let accel = CryptoAccelerator.accelerationSummary()
             HStack {
                 Label("硬件加速", systemImage: "bolt.fill")
@@ -94,7 +83,7 @@ struct SettingsView: View {
 
     private var serverTab: some View {
         ServerListView(
-            serverStore: ServerStore(),
+            serverStore: serverStore,
             proxyService: proxyService
         )
     }
@@ -103,8 +92,8 @@ struct SettingsView: View {
 
     private var subscriptionTab: some View {
         SubscriptionView(
-            serverStore: ServerStore(),
-            subscriptionStore: SubscriptionStore()
+            serverStore: serverStore,
+            subscriptionStore: subscriptionStore
         )
     }
 

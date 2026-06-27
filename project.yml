@@ -24,7 +24,6 @@ targets:
       - Bridges
       - Utils
       - Resources/Assets.xcassets
-      - Resources/default-pac.js
     dependencies: []
     settings:
       base:

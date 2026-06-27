@@ -37,7 +37,7 @@ final class SystemProxyService {
             case .global:
                 setSocksProxy(for: interface, host: "127.0.0.1", port: socks5Port)
             case .pac:
-                setAutoProxyURL(for: interface, url: pacFileURL())
+                setAutoProxyURL(for: interface, url: pacFileURL(socks5Port: socks5Port))
             case .direct:
                 // Don't enable anything
                 break
@@ -124,8 +124,8 @@ final class SystemProxyService {
         runNetworkSetup(["-setautoproxystate", interface, "off"])
     }
 
-    /// Generate PAC file URL (local file URL)
-    private func pacFileURL() -> String {
+    /// Generate PAC file URL (local file URL) — port is dynamic, not hardcoded
+    private func pacFileURL(socks5Port: UInt16) -> String {
         // Write PAC file to app support directory
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let pacDir = appSupport.appendingPathComponent("Shadowsocks", isDirectory: true)
@@ -134,7 +134,7 @@ final class SystemProxyService {
         let pacFile = pacDir.appendingPathComponent("proxy.pac")
 
         // Write default PAC content
-        let pacContent = DefaultPAC.generate(socks5Host: "127.0.0.1", socks5Port: 1080)
+        let pacContent = DefaultPAC.generate(socks5Host: "127.0.0.1", socks5Port: socks5Port)
         try? pacContent.write(to: pacFile, atomically: true, encoding: .utf8)
 
         return "file://\(pacFile.path)"
