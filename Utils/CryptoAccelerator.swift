@@ -6,9 +6,11 @@ enum CryptoAccelerator {
 
     /// Detect the current Apple Silicon chip generation
     static func chipGeneration() -> ChipGeneration {
-        // Read CPU type from sysctl
+        // Read CPU brand string via sysctl
         var size = 0
         sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0)
+        guard size > 0 else { return .intel }
+
         var cpuBrand = [CChar](repeating: 0, count: size)
         sysctlbyname("machdep.cpu.brand_string", &cpuBrand, &size, nil, 0)
         let brandString = String(cString: cpuBrand)
@@ -18,18 +20,16 @@ enum CryptoAccelerator {
         if brandString.contains("M2") { return .m2 }
         if brandString.contains("M1") { return .m1 }
 
-        // Check for Apple Silicon in general
-        var isARM = 0
-        size = MemoryLayout<Int32>.size
-        sysctlbyname("hw.optional.arm.FEAT_AES", &isARM, &size, nil, 0)
-
-        if isARM != 0 { return .m1 } // Generic ARM with AES
-        return .intel // x86_64 Intel Mac
+        // Check for Apple Silicon via AES feature flag
+        if hasAESAcceleration() {
+            return .m1 // Generic Apple Silicon with AES
+        }
+        return .intel
     }
 
     /// Check if ARM AES hardware acceleration is available
     static func hasAESAcceleration() -> Bool {
-        var hasAES = 0
+        var hasAES: Int32 = 0
         var size = MemoryLayout<Int32>.size
         sysctlbyname("hw.optional.arm.FEAT_AES", &hasAES, &size, nil, 0)
         return hasAES != 0
@@ -37,7 +37,7 @@ enum CryptoAccelerator {
 
     /// Check if ARM NEON is available
     static func hasNEON() -> Bool {
-        var hasNEON = 0
+        var hasNEON: Int32 = 0
         var size = MemoryLayout<Int32>.size
         sysctlbyname("hw.optional.neon", &hasNEON, &size, nil, 0)
         return hasNEON != 0
@@ -45,7 +45,7 @@ enum CryptoAccelerator {
 
     /// Check if ARM FEAT_SHA3 (used by BLAKE3) is available
     static func hasSHA3Acceleration() -> Bool {
-        var hasSHA3 = 0
+        var hasSHA3: Int32 = 0
         var size = MemoryLayout<Int32>.size
         sysctlbyname("hw.optional.arm.FEAT_SHA3", &hasSHA3, &size, nil, 0)
         return hasSHA3 != 0
@@ -53,12 +53,13 @@ enum CryptoAccelerator {
 
     /// Get a summary of available hardware acceleration features
     static func accelerationSummary() -> AccelerationSummary {
-        AccelerationSummary(
-            chip: chipGeneration(),
+        let chip = chipGeneration()
+        return AccelerationSummary(
+            chip: chip,
             hasAES: hasAESAcceleration(),
             hasNEON: hasNEON(),
             hasSHA3: hasSHA3Acceleration(),
-            isARM: chipGeneration() != .intel
+            isARM: chip != .intel
         )
     }
 }

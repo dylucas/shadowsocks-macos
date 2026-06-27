@@ -7,10 +7,13 @@ struct StatusBarView: View {
     @ObservedObject var proxyService: ProxyService
     @ObservedObject var serverStore: ServerStore
     @ObservedObject var subscriptionStore: SubscriptionStore
-    @State private var selectedServerID: UUID?
-    @State private var showingSettings = false
-    @State private var showingAddServer = false
-    @State private var showingAddSubscription = false
+    @State private var activeSheet: ActiveSheet?
+
+    private enum ActiveSheet: Identifiable {
+        case addServer
+        case addSubscription
+        var id: Self { self }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -128,7 +131,14 @@ struct StatusBarView: View {
         .padding(.vertical, 2)
         .contentShape(Rectangle())
         .onTapGesture {
-            selectedServerID = server.id
+            Task {
+                do {
+                    try await proxyService.start(
+                        serverID: server.id,
+                        serverStore: serverStore
+                    )
+                } catch { }
+            }
         }
     }
 
@@ -168,11 +178,11 @@ struct StatusBarView: View {
                 .foregroundColor(.secondary)
             HStack(spacing: 12) {
                 Button("添加服务器") {
-                    showingAddServer = true
+                    activeSheet = .addServer
                 }
                 .buttonStyle(.borderless)
                 Button("导入订阅") {
-                    showingAddSubscription = true
+                    activeSheet = .addSubscription
                 }
                 .buttonStyle(.borderless)
             }
@@ -202,24 +212,26 @@ struct StatusBarView: View {
             Spacer()
 
             Button {
-                showingAddServer = true
+                activeSheet = .addServer
             } label: {
                 Image(systemName: "plus")
             }
             .buttonStyle(.borderless)
 
             Button {
-                showingAddSubscription = true
+                activeSheet = .addSubscription
             } label: {
                 Image(systemName: "link")
             }
             .buttonStyle(.borderless)
         }
-        .sheet(isPresented: $showingAddServer) {
-            AddServerView(serverStore: serverStore)
-        }
-        .sheet(isPresented: $showingAddSubscription) {
-            AddSubscriptionView(subscriptionStore: subscriptionStore, serverStore: serverStore)
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .addServer:
+                AddServerView(serverStore: serverStore)
+            case .addSubscription:
+                AddSubscriptionView(subscriptionStore: subscriptionStore, serverStore: serverStore)
+            }
         }
     }
 }

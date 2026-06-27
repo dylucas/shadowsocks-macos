@@ -205,7 +205,7 @@ final class SslocalBridge: ObservableObject {
     private func appendLogs(_ lines: [String]) {
         recentLogs.append(contentsOf: lines)
         if recentLogs.count > maxLogLines {
-            recentLogs = recentLogs.suffix(maxLogLines)
+            recentLogs = Array(recentLogs.suffix(maxLogLines))
         }
     }
 

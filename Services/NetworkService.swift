@@ -1,14 +1,10 @@
 // NetworkService — Latency testing and connectivity checks
+// All methods are static — no instance state needed
 
 import Foundation
 import Network
 
-final class NetworkService {
-    private let timeout: TimeInterval = 5.0
-
-    init(timeout: TimeInterval = 5.0) {
-        self.timeout = timeout
-    }
+enum NetworkService {
 
     // MARK: - TCP Latency Test
 

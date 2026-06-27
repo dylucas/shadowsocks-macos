@@ -1,6 +1,7 @@
 // Subscription Model — Represents a subscription source that provides server configs
 
 import Foundation
+import Combine
 
 struct Subscription: Codable, Identifiable, Equatable {
     let id: UUID
