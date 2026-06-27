@@ -1,0 +1,16 @@
+.DS_Store
+.build/
+DerivedData/
+*.xcuserdata
+*.xcworkspace
+xcuserdata/
+!Shadowsocks.xcodeproj/project.pbxproj
+!Shadowsocks.xcodeproj/xcshareddata/
+build/
+*.moved-aside
+*.ipa
+*.dSYM.zip
+*.dSYM
+Pods/
+.node_modules/
+Package.resolved

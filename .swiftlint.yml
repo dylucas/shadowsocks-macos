@@ -1,0 +1,46 @@
+# SwiftLint Configuration for Shadowsocks macOS Client
+
+# Disabled rules — we relax some for macOS app conventions
+disabled_rules:
+  - trailing_whitespace
+  - line_length
+  - file_length
+  - type_body_length
+  - function_body_length
+
+# Enabled rules with custom config
+opt_in_rules:
+  - empty_count
+  - closure_spacing
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - redundant_nil_coalescing
+  - nimble_operator
+  - attributes
+  - operator_usage_whitespace
+  - prohibited_super_call
+  - vertical_whitespace_closing_braces
+
+# Custom configurations
+type_name:
+  min_length: 3
+  max_length: 50
+
+identifier_name:
+  min_length: 2
+  max_length: 50
+  excluded:
+    - id
+    - ip
+    - url
+    - ss
+
+# Excluded paths
+excluded:
+  - Tests
+  - Resources
+  - .build
+  - Pods
+
+# Report type
+reporter: "emoji"

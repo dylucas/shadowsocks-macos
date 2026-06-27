@@ -1,0 +1,72 @@
+name: Shadowsocks
+options:
+  bundleIdPrefix: com.shadowsocks
+  deploymentTarget:
+    macOS: "13.0"
+  minimumXcodeVersion: "15.0"
+  carthage: false
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    ARCHS: ["arm64", "x86_64"]
+    CODE_SIGN_IDENTITY: "Developer ID Application"
+    INFOPLIST_FILE: Resources/Info.plist
+
+targets:
+  Shadowsocks:
+    type: application
+    platform: macOS
+    sources:
+      - App
+      - Views
+      - Models
+      - Services
+      - Bridges
+      - Utils
+      - Resources/Assets.xcassets
+      - Resources/default-pac.js
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shadowsocks.macos
+        PRODUCT_NAME: Shadowsocks
+        LSUIElement: true
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Resources/Shadowsocks.entitlements
+    entitlements:
+      path: Resources/Shadowsocks.entitlements
+      properties:
+        com.apple.security.network.client: true
+        com.apple.security.network.server: true
+        com.apple.security.files.user-selected.read-only: true
+    dependencies:
+      # No external dependencies for MVP — sslocal is embedded binary
+    info:
+      path: Resources/Info.plist
+      properties:
+        LSUIElement: true
+        CFBundleShortVersionString: "1.0.0"
+
+  ShadowsocksTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/ShadowsocksTests
+    dependencies:
+      - target: Shadowsocks
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shadowsocks.macos.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Shadowsocks.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Shadowsocks"
+
+  ShadowsocksUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - Tests/ShadowsocksUITests
+    dependencies:
+      - target: Shadowsocks
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shadowsocks.macos.uitests
