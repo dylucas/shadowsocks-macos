@@ -4,8 +4,7 @@ DerivedData/
 *.xcuserdata
 *.xcworkspace
 xcuserdata/
-!Shadowsocks.xcodeproj/project.pbxproj
-!Shadowsocks.xcodeproj/xcshareddata/
+Shadowsocks.xcodeproj/
 build/
 *.moved-aside
 *.ipa

@@ -19,11 +19,12 @@ struct ShadowsocksApp: App {
                 serverStore: serverStore,
                 subscriptionStore: subscriptionStore
             )
-        }
-        .task {
-            // Connect AppDelegate to ProxyService for exit-time cleanup
-            appDelegate.configure(proxyService: proxyService)
-            proxyService.configure(serverStore: serverStore)
+            // .task is a View modifier — attach to the root view inside MenuBarExtra
+            .task {
+                // Connect AppDelegate to ProxyService for exit-time cleanup
+                appDelegate.configure(proxyService: proxyService)
+                proxyService.configure(serverStore: serverStore)
+            }
         }
 
         Settings {
