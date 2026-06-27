@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: macos-14 # M1 runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install xcodegen
+          brew install swiftlint
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build Release
+        run: |
+          xcodebuild -scheme Shadowsocks \
+            -destination 'platform=macOS,arch=arm64' \
+            -configuration Release \
+            archive \
+            -archivePath build/Shadowsocks.xcarchive
+
+      - name: Export App
+        run: |
+          # Copy the .app from the archive
+          cp -R build/Shadowsocks.xcarchive/Products/Applications/Shadowsocks.app build/Shadowsocks.app
+
+      - name: Create DMG
+        run: |
+          # Create a DMG for distribution
+          hdiutil create -volname "Shadowsocks" \
+            -srcfolder build/Shadowsocks.app \
+            -ov -format UDZO \
+            build/Shadowsocks.dmg
+
+      - name: Compute hashes
+        run: |
+          shasum -a 256 build/Shadowsocks.dmg > build/Shadowsocks.dmg.sha256
+          shasum -a 256 build/Shadowsocks.app.zip > build/Shadowsocks.app.zip.sha256 || true
+          cat build/Shadowsocks.dmg.sha256
+
+      - name: Create ZIP archive
+        run: |
+          cd build
+          zip -r Shadowsocks.app.zip Shadowsocks.app
+          shasum -a 256 Shadowsocks.app.zip > Shadowsocks.app.zip.sha256
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/Shadowsocks.dmg
+            build/Shadowsocks.app.zip
+            build/Shadowsocks.dmg.sha256
+            build/Shadowsocks.app.zip.sha256
+          draft: false
+          generate_release_notes: true
