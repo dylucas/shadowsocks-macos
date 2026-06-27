@@ -9,18 +9,12 @@ enum PasteboardParser {
     static func detectShadowsocksContent() -> String? {
         let pasteboard = NSPasteboard.general
 
-        // Check for URL types — correct macOS API is .url (lowercase)
-        if let url = pasteboard.string(forType: .url), url.hasPrefix("ss://") {
-            return url
-        }
-
-        // Check for plain text containing ss://
+        // Check plain text — most reliable since ss:// URLs are copied as text
         if let text = pasteboard.string(forType: .string) {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.hasPrefix("ss://") || trimmed.hasPrefix("{") {
                 return trimmed
             }
-            // Check if text contains at least one ss:// line
             if trimmed.contains("ss://") {
                 return trimmed
             }

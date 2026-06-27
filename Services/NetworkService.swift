@@ -18,32 +18,35 @@ enum NetworkService {
 
         let startTime = Date()
         let connected = await withCheckedContinuation { continuation in
+            let lock = NSLock()
             var resumed = false
+
             connection.stateUpdateHandler = { state in
+                lock.lock()
+                if resumed { lock.unlock(); return }
                 switch state {
                 case .ready:
-                    if !resumed {
-                        resumed = true
-                        continuation.resume(returning: true)
-                    }
+                    resumed = true
+                    lock.unlock()
+                    continuation.resume(returning: true)
                 case .failed, .cancelled:
-                    if !resumed {
-                        resumed = true
-                        continuation.resume(returning: false)
-                    }
+                    resumed = true
+                    lock.unlock()
+                    continuation.resume(returning: false)
                 default:
-                    break
+                    lock.unlock()
                 }
             }
             connection.start(queue: .global())
 
             // Timeout safety net
             DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
-                if !resumed {
-                    resumed = true
-                    connection.cancel()
-                    continuation.resume(returning: false)
-                }
+                lock.lock()
+                guard !resumed else { lock.unlock(); return }
+                resumed = true
+                lock.unlock()
+                connection.cancel()
+                continuation.resume(returning: false)
             }
         }
 
@@ -90,19 +93,20 @@ enum NetworkService {
         let connection = NWConnection(to: endpoint, using: .tcp)
 
         let connected = await withCheckedContinuation { continuation in
+            let lock = NSLock()
             var resumed = false
+
             connection.stateUpdateHandler = { state in
+                lock.lock()
+                defer { lock.unlock() }
+                guard !resumed else { return }
                 switch state {
                 case .ready:
-                    if !resumed {
-                        resumed = true
-                        continuation.resume(returning: true)
-                    }
+                    resumed = true
+                    continuation.resume(returning: true)
                 case .failed, .cancelled:
-                    if !resumed {
-                        resumed = true
-                        continuation.resume(returning: false)
-                    }
+                    resumed = true
+                    continuation.resume(returning: false)
                 default:
                     break
                 }
@@ -110,11 +114,12 @@ enum NetworkService {
             connection.start(queue: .global())
 
             DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) {
-                if !resumed {
-                    resumed = true
-                    connection.cancel()
-                    continuation.resume(returning: false)
-                }
+                lock.lock()
+                defer { lock.unlock() }
+                guard !resumed else { return }
+                resumed = true
+                connection.cancel()
+                continuation.resume(returning: false)
             }
         }
 
@@ -135,7 +140,7 @@ enum NetworkError: LocalizedError {
         case .connectionTimeout:
             return "连接超时，服务器可能不可达"
         case .invalidPort:
-            return "端口无效"
+            return "端���无效"
         case .hostNotFound:
             return "无法解析服务器地址"
         }
