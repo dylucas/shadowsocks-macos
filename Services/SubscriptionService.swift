@@ -84,7 +84,7 @@ enum SubscriptionParser {
         }
 
         let sip008 = try JSONDecoder().decode(SIP008Config.self, from: data)
-        return sip008.servers.map { entry ->
+        return sip008.servers.map { entry in
             Server(
                 name: entry.remarks ?? "",
                 address: entry.server,
